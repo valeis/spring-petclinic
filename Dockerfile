@@ -1,17 +1,12 @@
-FROM eclipse-temurin:17-jdk-jammy as base
-WORKDIR /app
-COPY .mvn/ .mvn
-COPY mvnw pom.xml ./
-RUN ./mvnw dependency:resolve
-COPY src ./src
+FROM maven:3.6-jdk-11-slim as BUILD
+COPY . /src
+WORKDIR /src
+RUN mvn install -DskipTests
 
-FROM base as development
-CMD ["./mvnw", "spring-boot:run", "-Dspring-boot.run.profiles=mysql", "-Dspring-boot.run.jvmArguments='-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:8000'"]
-
-FROM base as build
-RUN ./mvnw package
-
-FROM eclipse-temurin:17-jre-jammy as production
+FROM openjdk:11.0.1-jre-slim-stretch
 EXPOSE 8080
-COPY --from=build /app/target/spring-petclinic-*.jar /spring-petclinic.jar
-CMD ["java", "-Djava.security.egd=file:/dev/./urandom", "-jar", "/]
+WORKDIR /app
+ARG JAR=spring-petclinic-2.4.2.jar
+
+COPY --from=BUILD /src/target/$JAR /app.jar
+ENTRYPOINT ["java","-jar","/app.jar"]
