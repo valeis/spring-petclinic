@@ -1,12 +1,17 @@
-FROM maven:3.6-jdk-11-slim as BUILD
-COPY . /src
-WORKDIR /src
-RUN mvn install -DskipTests
+FROM maven:3.6.1-jdk-8 as build
+COPY ./ /micronaut-petclinic/
+WORKDIR /micronaut-petclinic
+RUN mvn package
 
-FROM openjdk:11.0.1-jre-slim-stretch
+FROM oracle/graalvm-ce:19.2.0 as graalvm
+RUN gu install native-image
+#FROM bufferings/build-graalvm-docker as graalvm
+WORKDIR /work
+COPY --from=build /micronaut-petclinic/target/micronaut-petclinic-*.jar .
+RUN native-image --no-server -cp micronaut-petclinic-*.jar
+
+FROM frolvlad/alpine-glibc
 EXPOSE 8080
 WORKDIR /app
-ARG JAR=spring-petclinic-2.4.2.jar
-
-COPY --from=BUILD /src/target/$JAR /app.jar
-ENTRYPOINT ["java","-jar","/app.jar"]
+COPY --from=graalvm /work/petclinic .
+CMD ["/app/petclinic"]
